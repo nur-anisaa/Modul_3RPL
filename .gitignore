@@ -1,11 +1,7 @@
-
-# Python cache
-__pycache__/
 *.py[cod]
-
-# Virtual environment
 env/
+build/
+dist/
 venv/
-
-# Environment variables
+__pycache__/
 .env

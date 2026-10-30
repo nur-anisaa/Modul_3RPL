@@ -1,18 +1,23 @@
+
 name: Python CI Pipeline - Sistem Perpustakaan
 
-# Pipeline berjalan otomatis saat ada push atau pull request ke branch main
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
+
+  workflow_dispatch:
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Mengambil Kode dari Repositori (Checkout)
+      - name: 1. Mengambil Kode dari Repositori
         uses: actions/checkout@v4
 
       - name: 2. Menyiapkan Lingkungan Python 3.11
@@ -25,6 +30,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 4. Menjalankan Automated Unit Testing (Pytest)
+      - name: 4. Menjalankan Automated Unit Testing
         run: |
           python -m pytest -v

@@ -8,7 +8,7 @@ class BukuModel:
         self.conn = self.db.get_connection()
         self.table_name = "buku"
 
-    # MENAMPILKAN DATA BUKU
+    # MENAMPILKAN SEMUA DATA BUKU
     def get_all_buku(self):
         if not self.conn:
             print("Koneksi database gagal!")
@@ -25,7 +25,7 @@ class BukuModel:
             return cursor.fetchall()
 
         except Exception as e:
-            print("Gagal mengambil data:", repr(e))
+            print("Gagal mengambil data buku:", repr(e))
             return []
 
         finally:
@@ -49,11 +49,13 @@ class BukuModel:
                 VALUES (%s, %s, %s)
             """
 
-            cursor.execute(
-                query,
-                (judul, penulis, int(tahun_terbit))
+            values = (
+                judul,
+                penulis,
+                int(tahun_terbit)
             )
 
+            cursor.execute(query, values)
             self.conn.commit()
 
             print("Data buku berhasil disimpan!")
@@ -61,7 +63,7 @@ class BukuModel:
 
         except Exception as e:
             self.conn.rollback()
-            print("Gagal menyimpan data:", repr(e))
+            print("Gagal menyimpan data buku:", repr(e))
             return False
 
         finally:
@@ -87,38 +89,37 @@ class BukuModel:
                 WHERE id_buku = %s
             """
 
-            cursor.execute(
-                query,
-                (
-                    judul,
-                    penulis,
-                    int(tahun_terbit),
-                    int(id_buku)
-                )
+            values = (
+                judul,
+                penulis,
+                int(tahun_terbit),
+                int(id_buku)
             )
+
+            cursor.execute(query, values)
 
             jumlah_perubahan = cursor.rowcount
 
             self.conn.commit()
 
-            # Jika ada perubahan, Update berhasil
             if jumlah_perubahan > 0:
                 print("Data buku berhasil diperbarui!")
                 return True
 
             # Memeriksa apakah ID buku masih tersedia
-            query_cek = f"""
+            cursor.execute(
+                f"""
                 SELECT id_buku
                 FROM {self.table_name}
                 WHERE id_buku = %s
-            """
-
-            cursor.execute(query_cek, (int(id_buku),))
+                """,
+                (int(id_buku),)
+            )
 
             buku_ditemukan = cursor.fetchone() is not None
 
             if buku_ditemukan:
-                print("Data buku ditemukan dan tidak mengalami perubahan.")
+                print("Data buku tidak mengalami perubahan.")
                 return True
 
             print(f"Buku dengan ID {id_buku} tidak ditemukan.")
@@ -126,14 +127,45 @@ class BukuModel:
 
         except Exception as e:
             self.conn.rollback()
-            print("Gagal memperbarui data:", repr(e))
+            print("Gagal memperbarui data buku:", repr(e))
             return False
 
         finally:
             if cursor is not None:
                 cursor.close()
 
-    # MENGHAPUS DATA BUKU
+    # MENGHITUNG RIWAYAT PEMINJAMAN
+    def hitung_peminjaman_buku(self, id_buku):
+        if not self.conn:
+            print("Koneksi database gagal!")
+            return None
+
+        cursor = None
+
+        try:
+            cursor = self.conn.cursor()
+
+            query = """
+                SELECT COUNT(*)
+                FROM peminjaman
+                WHERE id_buku = %s
+            """
+
+            cursor.execute(query, (int(id_buku),))
+
+            hasil = cursor.fetchone()
+
+            return hasil[0] if hasil else 0
+
+        except Exception as e:
+            print("Gagal memeriksa riwayat peminjaman:", repr(e))
+            return None
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+    # MENGHAPUS BUKU BESERTA RIWAYAT PEMINJAMAN
     def delete_buku(self, id_buku):
         if not self.conn:
             print("Koneksi database gagal!")
@@ -144,27 +176,52 @@ class BukuModel:
         try:
             cursor = self.conn.cursor()
 
-            query = f"""
+            # 1. Menghapus riwayat peminjaman buku terlebih dahulu
+            query_peminjaman = """
+                DELETE FROM peminjaman
+                WHERE id_buku = %s
+            """
+
+            cursor.execute(
+                query_peminjaman,
+                (int(id_buku),)
+            )
+
+            jumlah_peminjaman = cursor.rowcount
+
+            # 2. Menghapus data buku
+            query_buku = f"""
                 DELETE FROM {self.table_name}
                 WHERE id_buku = %s
             """
 
-            cursor.execute(query, (int(id_buku),))
+            cursor.execute(
+                query_buku,
+                (int(id_buku),)
+            )
 
-            jumlah_dihapus = cursor.rowcount
+            jumlah_buku = cursor.rowcount
 
+            # Memastikan buku ditemukan
+            if jumlah_buku == 0:
+                self.conn.rollback()
+                print(f"Buku ID {id_buku} tidak ditemukan.")
+                return False
+
+            # 3. Menyimpan kedua proses penghapusan
             self.conn.commit()
 
-            if jumlah_dihapus > 0:
-                print("Data buku berhasil dihapus!")
-                return True
+            print(
+                f"Buku ID {id_buku} berhasil dihapus "
+                f"beserta {jumlah_peminjaman} riwayat peminjaman."
+            )
 
-            print(f"Buku dengan ID {id_buku} tidak ditemukan.")
-            return False
+            return True
 
         except Exception as e:
+            # Membatalkan seluruh penghapusan jika terjadi kesalahan
             self.conn.rollback()
-            print("Gagal menghapus data:", repr(e))
+            print("Gagal menghapus data buku:", repr(e))
             return False
 
         finally:

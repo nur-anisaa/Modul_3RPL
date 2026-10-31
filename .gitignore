@@ -1,7 +1,11 @@
+
 *.py[cod]
 env/
+venv/
+.venv/
+.venv-1/
 build/
 dist/
-venv/
 __pycache__/
+.pytest_cache/
 .env
